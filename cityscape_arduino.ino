@@ -8,6 +8,31 @@ void loop() {
 
 }
 
+//Bluetooth Lifecycle
+#define CITYSCAPESERVICE 0xCC00
+
+int32_t csServiceId;
+int32_t csBoardStateCharId;
+int32_t csBoardUpdateCharId;
+
+int initializeBluetoothService() {
+  /* Change the device name to make it easier to find */
+  Serial.println(F("Setting device name to 'Cityscape Board': "));
+
+  if (! ble.sendCommandCheckOK(F("AT+GAPDEVNAME=Cityscape Board")) ) {
+    error(F("Could not set device name?"));
+    return 1;
+  }
+
+  /* Add the Cityscape Service definition */
+  /* Service ID should be 1 */
+  Serial.println(F("Adding the Cityscape Service definition (UUID = CITYSCAPESERVICE): "));
+  success = ble.sendCommandWithIntReply( F("AT+GATTADDSERVICE=UUID=CITYSCAPESERVICE"), &csServiceId);
+  if (! success) {
+    error(F("Could not add Cityscape service"));
+  }
+}
+
 //Structure Type Constants:
 const int POWER_SOLAR = 0;
 const int POWER_WIND = 1;

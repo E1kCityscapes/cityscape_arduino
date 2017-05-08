@@ -10,11 +10,13 @@
 void setup() {
   // put your setup code here, to run once:
   Serial.begin(115200);
+  
   Serial.println(F("Cityscape Board Microcontroller"));
   Serial.println(F("---------------------------------------------------"));
 
   randomSeed(micros());
-
+  
+  initializePins();
   initializeBluetoothService();
 }
 
@@ -29,11 +31,11 @@ SoftwareSerial bluefruitSS = SoftwareSerial(BLUEFRUIT_SWUART_TXD_PIN, BLUEFRUIT_
 Adafruit_BluefruitLE_UART ble(bluefruitSS, BLUEFRUIT_UART_MODE_PIN,
                       BLUEFRUIT_UART_CTS_PIN, BLUEFRUIT_UART_RTS_PIN);
 
-#define GATTSERV_CITYSCAPE "0xCC00"
-#define GATTCHAR_BOARDSSTATE "0xCC01"
-#define GATTCHAR_BOARDPOWERSTATES "0xCC02"
-#define GATTCHAR_BOARDBUILDINGSTATES "0xCC03"
-#define GATTCHAR_BOARDTRANSITSTATES "0xCC04"
+#define GATTSERV_CITYSCAPE "0xcc00"
+#define GATTCHAR_BOARDSSTATE "0xcc01"
+#define GATTCHAR_BOARDPOWERSTATES "0xcc02"
+#define GATTCHAR_BOARDBUILDINGSTATES "0xcc03"
+#define GATTCHAR_BOARDTRANSITSTATES "0xcc04"
 
 int32_t csServiceId;
 int32_t csBoardSStateCharId;
@@ -62,7 +64,7 @@ int initializeBluetoothService() {
   }
 
   /* Disable command echo from Bluefruit */
-  ble.echo(false);
+//  ble.echo(false);
 
   Serial.println("Requesting Bluefruit info:");
   /* Print Bluefruit information */
@@ -88,14 +90,14 @@ int initializeBluetoothService() {
   /* Chars ID for Measurement should be 1 */
   //TODO: Min/max len
   Serial.println(F("Adding the Structure State characteristic (UUID =" GATTCHAR_BOARDSSTATE "): "));
-  success = ble.sendCommandWithIntReply( F("AT+GATTADDCHAR=UUID=" GATTCHAR_BOARDSSTATE ", PROPERTIES=0x10, MIN_LEN=1, MAX_LEN=20"), &csBoardSStateCharId);
+  success = ble.sendCommandWithIntReply( F("AT+GATTADDCHAR=UUID=" GATTCHAR_BOARDSSTATE ", PROPERTIES=0x12, MIN_LEN=1, MAX_LEN=20, DATATYPE=2"), &csBoardSStateCharId);
     if (! success) {
     error(F("Could not add Structure State characteristic"));
   }
 
   /* Add the Cityscape Service to the advertising data (needed for Nordic apps to detect the service) */
   Serial.print(F("Adding Cityscape Service UUID to the advertising payload: "));
-  ble.sendCommandCheckOK( F("AT+GAPSETADVDATA=02-01-06-05-02-00-CC-0a-18") );
+  ble.sendCommandCheckOK( F("AT+GAPSETADVDATA=02-01-06-05-02-00-cc-0a-18") );
 
   /* Reset the device for the new service setting changes to take effect */
   Serial.print(F("Performing a SW reset (service changes require a reset): "));
@@ -130,38 +132,43 @@ const byte TRANSIT_BUS_STOP = 0x00;
 int onStructure(byte combinedType, byte id, bool state, byte level) {
   // bluetooth handling here. return 1 on success and 0 on fail maybe
 
-  Serial.print(F("Board updated: \n Type:"));
-  Serial.print(combinedType);
+  Serial.print(F("Board updated: \nType:"));
+  Serial.println(combinedType);
   Serial.print(F("Coord:"));
-  Serial.print(id);
+  Serial.println(id);
   Serial.print(F("State:"));
   Serial.println(state);
   Serial.print(F("Level:"));
   Serial.println(level);
   Serial.print(F("UpdateNum:"));
-  Serial.println(updateNum);
+  Serial.println(updateNum, HEX);
 
   if(bluetoothInitialized) {
     /* Command is sent when \n (\r) or println is called */
     /* AT+GATTCHAR=CharacteristicID,value */
+    
     ble.print( F("AT+GATTCHAR=") );
     ble.print( csBoardSStateCharId );
     //Characteristic
-    ble.print( F(",00-") );
-    //Update number. Increments by 1 on each successful notify send.
-    ble.print( updateNum, HEX );
-    ble.print( F("-") );
-    //Adds +1 to the id if true
-    ble.print(combinedType+(state? 0 : 1), HEX);
-    ble.print( F("-") );
-    ble.print(id, HEX);
-    if(level) {
-      ble.print( F("-") );
-      ble.print(level, HEX);
-    }
+    char combinedValue[15] = {0};
+    //Add +1 to the type value if state is false
+    sprintf(combinedValue, "00-%02X-%02X-%02X-%02X", updateNum,combinedType+(state? 0 : 1),id, level);
+    ble.print( F(","));
+    ble.println(combinedValue);
+//    ble.print( F(",00-") );
+//    //Update number. Increments by 1 on each successful notify send.
+//    ble.print( updateNum, HEX );
+//    ble.print( F("-") );
+//    //Adds +1 to the id if true
+//    ble.print(, HEX);
+//    ble.print( F("-") );
+//    ble.print(id, HEX);
+//    if(level) {
+//      ble.print( F("-") );
+//      ble.print(level, HEX);
+//    }
     
     ble.print( F("\n") );
-  
   
     /* Check if command executed OK */
     if ( !ble.waitForOK() )
@@ -203,6 +210,18 @@ bool building_state[] = {0};
 const byte NUM_TRANSIT = 0;
 const byte TRANSIT_PINS[] = {};
 bool transit_state[] = {};
+
+void initializePins() {
+  for(byte i = 0; i < NUM_BUILDING; i++) {
+    pinMode(BUILDING_PINS[i], INPUT);
+  }
+  for(byte i = 0; i < NUM_POWER; i++) {
+    pinMode(POWER_PINS[i], INPUT);
+  }
+  for(byte i = 0; i < NUM_TRANSIT; i++) {
+    pinMode(TRANSIT_PINS[i], INPUT);
+  }
+}
 
 void loop() {
   // put your main code here, to run repeatedly:

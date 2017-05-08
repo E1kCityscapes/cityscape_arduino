@@ -27,6 +27,7 @@ const byte TRANSIT_BUS_STOP = 0x00;
 // Board Pin Layout Constants
 const byte NUM_POWER = 0;
 const byte POWER_PINS[] = {};
+const byte POWER_TYPES[] = {};
 
 const byte NUM_BUILDING = 1;
 const byte BUILDING_PINS[] = {22};

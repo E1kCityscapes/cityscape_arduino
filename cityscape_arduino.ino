@@ -196,6 +196,8 @@ void initializePins() {
   }
 }
 
+//Main loop
+
 void loop() {
   // put your main code here, to run repeatedly:
   for(byte i = 0; i < NUM_BUILDING; i++) {

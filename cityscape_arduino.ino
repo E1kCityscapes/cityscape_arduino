@@ -14,11 +14,8 @@ void setup() {
   Serial.println(F("---------------------------------------------------"));
 
   randomSeed(micros());
-}
 
-void loop() {
-  // put your main code here, to run repeatedly:
-
+  initializeBluetoothService();
 }
 
 //Utility
@@ -32,17 +29,19 @@ SoftwareSerial bluefruitSS = SoftwareSerial(BLUEFRUIT_SWUART_TXD_PIN, BLUEFRUIT_
 Adafruit_BluefruitLE_UART ble(bluefruitSS, BLUEFRUIT_UART_MODE_PIN,
                       BLUEFRUIT_UART_CTS_PIN, BLUEFRUIT_UART_RTS_PIN);
 
-#define GATTSERV_CITYSCAPE 0xCC00
-#define GATTCHAR_BOARDSSTATE 0xCC01
-#define GATTCHAR_BOARDPOWERSTATES 0xCC02
-#define GATTCHAR_BOARDBUILDINGSTATES 0xCC03
-#define GATTCHAR_BOARDTRANSITSTATES 0xCC04
+#define GATTSERV_CITYSCAPE "0xCC00"
+#define GATTCHAR_BOARDSSTATE "0xCC01"
+#define GATTCHAR_BOARDPOWERSTATES "0xCC02"
+#define GATTCHAR_BOARDBUILDINGSTATES "0xCC03"
+#define GATTCHAR_BOARDTRANSITSTATES "0xCC04"
 
 int32_t csServiceId;
 int32_t csBoardSStateCharId;
 int32_t csBoardPowerStatesCharId;
 int32_t csBoardBuildingStatesCharId;
 int32_t csBoardTransitStatesCharId;
+
+boolean bluetoothInitialized = false;
 
 int initializeBluetoothService() {
   boolean success;
@@ -79,8 +78,8 @@ int initializeBluetoothService() {
 
   /* Add the Cityscape Service definition */
   /* Service ID should be 1 */
-  Serial.println(F("Adding the Cityscape Service definition (UUID = GATTSERV_CITYSCAPE): "));
-  success = ble.sendCommandWithIntReply( F("AT+GATTADDSERVICE=UUID=GATTSERV_CITYSCAPE"), &csServiceId);
+  Serial.println(F("Adding the Cityscape Service definition (UUID = " GATTSERV_CITYSCAPE "): "));
+  success = ble.sendCommandWithIntReply( F("AT+GATTADDSERVICE=UUID=" GATTSERV_CITYSCAPE), &csServiceId);
   if (! success) {
     error(F("Could not add Cityscape service"));
   }
@@ -88,34 +87,137 @@ int initializeBluetoothService() {
   /* Add the Structure State characteristic */
   /* Chars ID for Measurement should be 1 */
   //TODO: Min/max len
-  Serial.println(F("Adding the Structure State characteristic (UUID = GATTCHAR_BOARDSSTATE): "));
-  success = ble.sendCommandWithIntReply( F("AT+GATTADDCHAR=UUID=GATTCHAR_BOARDSSTATE, PROPERTIES=0x10, MIN_LEN=1, MAX_LEN=20, VALUE=00-00, DESCRIPTION=Structure State"), &csBoardSStateCharId);
+  Serial.println(F("Adding the Structure State characteristic (UUID =" GATTCHAR_BOARDSSTATE "): "));
+  success = ble.sendCommandWithIntReply( F("AT+GATTADDCHAR=UUID=" GATTCHAR_BOARDSSTATE ", PROPERTIES=0x10, MIN_LEN=1, MAX_LEN=20"), &csBoardSStateCharId);
     if (! success) {
     error(F("Could not add Structure State characteristic"));
   }
+
+  /* Add the Cityscape Service to the advertising data (needed for Nordic apps to detect the service) */
+  Serial.print(F("Adding Cityscape Service UUID to the advertising payload: "));
+  ble.sendCommandCheckOK( F("AT+GAPSETADVDATA=02-01-06-05-02-00-CC-0a-18") );
+
+  /* Reset the device for the new service setting changes to take effect */
+  Serial.print(F("Performing a SW reset (service changes require a reset): "));
+  ble.reset();
+
+  Serial.println();
+
+  bluetoothInitialized=true;
 }
 
 //Structure Type Constants:
-const int POWER_SOLAR = 0;
-const int POWER_WIND = 1;
-const int POWER_COAL = 2;
 
-const int BUILDING_HOUSE_SMALL = 0;
-const int BUILDING_HOUSE_LARGE = 1;
-const int BUILDING_APARTMENT_SMALL = 2;
-const int BUILDING_APARTMENT_LARGE = 3;
+byte updateNum = 0x00;
 
-const int TRANSIT_BUS_STOP = 0;
+const byte POWER_BASE = 0x00;
 
-int onPowerPlant(int type, int id, bool state, float level) {
+const byte POWER_SOLAR = 0x00;
+const byte POWER_WIND = 0x02;
+const byte POWER_COAL = 0x04;
+
+const byte BUILDING_BASE = 0x20;
+
+const byte BUILDING_HOUSE_SMALL = 0x00;
+const byte BUILDING_HOUSE_LARGE = 0x02;
+const byte BUILDING_APARTMENT_SMALL = 0x04;
+const byte BUILDING_APARTMENT_LARGE = 0x06;
+
+const byte TRANSIT_BASE = 0x40;
+
+const byte TRANSIT_BUS_STOP = 0x00;
+
+int onStructure(byte combinedType, byte id, bool state, byte level) {
   // bluetooth handling here. return 1 on success and 0 on fail maybe
+
+  Serial.print(F("Board updated: \n Type:"));
+  Serial.print(combinedType);
+  Serial.print(F("Coord:"));
+  Serial.print(id);
+  Serial.print(F("State:"));
+  Serial.println(state);
+  Serial.print(F("Level:"));
+  Serial.println(level);
+  Serial.print(F("UpdateNum:"));
+  Serial.println(updateNum);
+
+  if(bluetoothInitialized) {
+    /* Command is sent when \n (\r) or println is called */
+    /* AT+GATTCHAR=CharacteristicID,value */
+    ble.print( F("AT+GATTCHAR=") );
+    ble.print( csBoardSStateCharId );
+    //Characteristic
+    ble.print( F(",00-") );
+    //Update number. Increments by 1 on each successful notify send.
+    ble.print( updateNum, HEX );
+    ble.print( F("-") );
+    //Adds +1 to the id if true
+    ble.print(combinedType+(state? 0 : 1), HEX);
+    ble.print( F("-") );
+    ble.print(id, HEX);
+    if(level) {
+      ble.print( F("-") );
+      ble.print(level, HEX);
+    }
+    
+    ble.print( F("\n") );
+  
+  
+    /* Check if command executed OK */
+    if ( !ble.waitForOK() )
+    {
+      Serial.println(F("Failed to get response!"));
+      return 1;
+    }
+    updateNum++;
+    return 0;
+  } else {
+    Serial.println(F("Bluetooth not initialized!"));
+    return 2;
+  }
 }
 
-int onBuilding(int type, int coord, bool state) {
-  // bluetooth handling here. return 1 on success and 0 on fail maybe
+int onPowerPlant(byte subtype, byte id, bool state, byte level) {
+  return onStructure(subtype+POWER_BASE, id, state, level);
 }
 
-int onTransit(int type, int coord, bool state) {
-  // bluetooth handling here. return 1 on success and 0 on fail maybe
+int onBuilding(byte subtype, byte coord, bool state) {
+  return onStructure(subtype+BUILDING_BASE, coord, state, 0);
 }
 
+int onTransit(byte subtype, byte coord, bool state) {
+  return onStructure(subtype+TRANSIT_BASE, coord, state, 0);
+}
+
+
+//Wiring + states
+const byte NUM_POWER = 0;
+const byte POWER_PINS[] = {};
+bool power_state[] = {};
+byte power_level[] = {};
+
+const byte NUM_BUILDING = 1;
+const byte BUILDING_PINS[] = {22};
+bool building_state[] = {0};
+
+const byte NUM_TRANSIT = 0;
+const byte TRANSIT_PINS[] = {};
+bool transit_state[] = {};
+
+void loop() {
+  // put your main code here, to run repeatedly:
+  for(byte i = 0; i < NUM_BUILDING; i++) {
+    bool currentState = digitalRead(BUILDING_PINS[i]) == LOW;
+    if (currentState != building_state[i]) {
+      building_state[i] = currentState;
+      onBuilding(BUILDING_HOUSE_SMALL, i, currentState);
+    }
+  }
+  for(byte i = 0; i < NUM_TRANSIT; i++) {
+    bool currentState = digitalRead(TRANSIT_PINS[i]) == LOW;
+    if (currentState != transit_state[i]) {
+      transit_state[i] = currentState;
+      onTransit(TRANSIT_BUS_STOP, i, currentState);
+    }
+  }
+}

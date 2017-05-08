@@ -64,7 +64,7 @@ int initializeBluetoothService() {
   }
 
   /* Disable command echo from Bluefruit */
-//  ble.echo(false);
+  ble.echo(false);
 
   Serial.println("Requesting Bluefruit info:");
   /* Print Bluefruit information */
@@ -151,22 +151,10 @@ int onStructure(byte combinedType, byte id, bool state, byte level) {
     ble.print( csBoardSStateCharId );
     //Characteristic
     char combinedValue[15] = {0};
-    //Add +1 to the type value if state is false
-    sprintf(combinedValue, "00-%02X-%02X-%02X-%02X", updateNum,combinedType+(state? 0 : 1),id, level);
+    //Add +1 to the type value if state is true
+    sprintf(combinedValue, "00-%02X-%02X-%02X-%02X", updateNum,combinedType+(state? 1 : 0),id, level);
     ble.print( F(","));
     ble.println(combinedValue);
-//    ble.print( F(",00-") );
-//    //Update number. Increments by 1 on each successful notify send.
-//    ble.print( updateNum, HEX );
-//    ble.print( F("-") );
-//    //Adds +1 to the id if true
-//    ble.print(, HEX);
-//    ble.print( F("-") );
-//    ble.print(id, HEX);
-//    if(level) {
-//      ble.print( F("-") );
-//      ble.print(level, HEX);
-//    }
     
     ble.print( F("\n") );
   
@@ -176,6 +164,7 @@ int onStructure(byte combinedType, byte id, bool state, byte level) {
       Serial.println(F("Failed to get response!"));
       return 1;
     }
+    //increment by 1 on success
     updateNum++;
     return 0;
   } else {

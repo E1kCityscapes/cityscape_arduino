@@ -193,6 +193,8 @@ const byte POWER_PINS[] = {};
 bool power_state[] = {};
 byte power_level[] = {};
 
+// set power level of solar and wind to be 255!!!
+
 const byte NUM_BUILDING = 1;
 const byte BUILDING_PINS[] = {22};
 bool building_state[] = {0};
@@ -200,6 +202,10 @@ bool building_state[] = {0};
 const byte NUM_TRANSIT = 0;
 const byte TRANSIT_PINS[] = {};
 bool transit_state[] = {};
+
+float rawPower;
+int coal; //THIS WILL BE CHANGED!!
+float ratioPower;
 
 void initializePins() {
   for(byte i = 0; i < NUM_BUILDING; i++) {
@@ -229,4 +235,25 @@ void loop() {
       onTransit(TRANSIT_BUS_STOP, i, currentState);
     }
   }
+  for(byte i = 0; i < NUM_POWER; i++) {
+    bool currentState = digitalRead(POWER_PINS[i]) == LOW;
+    if (currentState != power_state[i]) {
+      power_state[i] = currentState;
+      onPowerPlant(POWER_BASE, i, currentState, power_level[i]); //WHAT TO PUT FOR POWER_BASE??
+    }
+  }
+
+  rawPower = analogRead(coal); //NOT SURE WHAT TO PUT HERE!!!
+  ratioPower = (float) rawPower/1023;
+  int currentLevel = (int) ratioPower*255;
+  Serial.print(F("New Power Level:"));
+  Serial.print(currentLevel);
+  if (currentLevel != power_level[coal]){ //HARD CODE THE NUMBER THAT IT IS!!!!
+    power_level[coal] = currentLevel;
+    onPowerPlant(POWER_BASE, coal, power_state[coal], currentLevel);
+  }
+
+    
+  delay(250);
+  
 }

@@ -6,6 +6,7 @@
 #include "Adafruit_BluefruitLE_UART.h"
 
 #include "BluefruitConfig.h"
+#include "CityscapeConfig.h"
 
 void setup() {
   // put your setup code here, to run once:
@@ -30,17 +31,12 @@ SoftwareSerial bluefruitSS = SoftwareSerial(BLUEFRUIT_SWUART_TXD_PIN, BLUEFRUIT_
 Adafruit_BluefruitLE_UART ble(bluefruitSS, BLUEFRUIT_UART_MODE_PIN,
                       BLUEFRUIT_UART_CTS_PIN, BLUEFRUIT_UART_RTS_PIN);
 
-#define GATTSERV_CITYSCAPE "0xcc00"
-#define GATTCHAR_BOARDSSTATE "0xcc01"
-#define GATTCHAR_BOARDPOWERSTATES "0xcc02"
-#define GATTCHAR_BOARDBUILDINGSTATES "0xcc03"
-#define GATTCHAR_BOARDTRANSITSTATES "0xcc04"
-
 int32_t csServiceId;
 int32_t csBoardSStateCharId;
 int32_t csBoardPowerStatesCharId;
 int32_t csBoardBuildingStatesCharId;
 int32_t csBoardTransitStatesCharId;
+int32_t csBoardInfoCharId;
 
 boolean bluetoothInitialized = false;
 
@@ -86,7 +82,6 @@ int initializeBluetoothService() {
   }
 
   /* Add the Structure State characteristic */
-  /* Chars ID for Measurement should be 1 */
   //TODO: Min/max len
   Serial.println(F("Adding the Structure State characteristic (UUID =" GATTCHAR_BOARDSSTATE "): "));
   success = ble.sendCommandWithIntReply( F("AT+GATTADDCHAR=UUID=" GATTCHAR_BOARDSSTATE ", PROPERTIES=0x12, MIN_LEN=1, MAX_LEN=20, DATATYPE=2"), &csBoardSStateCharId);
@@ -94,9 +89,21 @@ int initializeBluetoothService() {
     error(F("Could not add Structure State characteristic"));
   }
 
+  /* Add the Board Info characteristic */
+  //TODO: Min/max len
+  Serial.println(F("Adding the Board Info characteristic (UUID =" GATTCHAR_BOARDINFO "): "));
+
+  char boardInfoCommand [150] = {0};
+  sprintf(boardInfoCommand, "AT+GATTADDCHAR=UUID=" GATTCHAR_BOARDINFO ", PROPERTIES=0x02, MIN_LEN=1, MAX_LEN=20, DATATYPE=2, DATATYPE=2, VALUE=00-%02X-%02X-%02X", NUM_POWER, NUM_BUILDING,NUM_TRANSIT);
+  
+  success = ble.sendCommandWithIntReply( boardInfoCommand, &csBoardInfoCharId);
+  if (! success) {
+    error(F("Could not add Board Info characteristic"));
+  }
+
   /* Add the Cityscape Service to the advertising data (needed for Nordic apps to detect the service) */
   Serial.print(F("Adding Cityscape Service UUID to the advertising payload: "));
-  ble.sendCommandCheckOK( F("AT+GAPSETADVDATA=02-01-06-05-02-00-cc-0a-18") );
+  ble.sendCommandCheckOK( F("AT+GAPSETADVDATA=02-01-06-07-02-00-cc-05-cc-0a-18") );
 
   /* Reset the device for the new service setting changes to take effect */
   Serial.print(F("Performing a SW reset (service changes require a reset): "));
@@ -111,30 +118,11 @@ int initializeBluetoothService() {
 
 byte updateNum = 0x00;
 
-const byte POWER_BASE = 0x00;
-
-const byte POWER_SOLAR = 0x00;
-const byte POWER_WIND = 0x01;
-const byte POWER_COAL = 0x02;
-
-const byte BUILDING_BASE = 0x20;
-
-const byte BUILDING_HOUSE_SMALL = 0x00;
-const byte BUILDING_HOUSE_LARGE = 0x01;
-const byte BUILDING_APARTMENT_SMALL = 0x02;
-const byte BUILDING_APARTMENT_LARGE = 0x03;
-
-const byte TRANSIT_BASE = 0x40;
-
-const byte TRANSIT_BUS_STOP = 0x00;
-
 int onStructure(byte combinedType, byte id, bool state, byte level) {
   // bluetooth handling here. return 1 on success and 0 on fail maybe
 
   Serial.print(F("Board updated: \nType:"));
   Serial.println(combinedType, BIN);
-//  Serial.println((TRANSIT_BASE+TRANSIT_BUS_STOP) | 1<<7, BIN);
-//  Serial.println(255, BIN);
   Serial.print(F("Coord:"));
   Serial.println(id);
   Serial.print(F("State:"));
@@ -188,17 +176,12 @@ int onTransit(byte subtype, byte coord, bool state) {
 
 
 //Wiring + states
-const byte NUM_POWER = 0;
-const byte POWER_PINS[] = {};
+
 bool power_state[] = {};
 byte power_level[] = {};
 
-const byte NUM_BUILDING = 1;
-const byte BUILDING_PINS[] = {22};
 bool building_state[] = {0};
 
-const byte NUM_TRANSIT = 0;
-const byte TRANSIT_PINS[] = {};
 bool transit_state[] = {};
 
 void initializePins() {

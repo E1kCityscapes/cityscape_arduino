@@ -13,7 +13,6 @@ void setup() {
   
   Serial.println(F("Cityscape Board Microcontroller"));
   Serial.println(F("---------------------------------------------------"));
-
   randomSeed(micros());
   
   initializePins();
@@ -115,15 +114,15 @@ byte updateNum = 0x00;
 const byte POWER_BASE = 0x00;
 
 const byte POWER_SOLAR = 0x00;
-const byte POWER_WIND = 0x02;
-const byte POWER_COAL = 0x04;
+const byte POWER_WIND = 0x01;
+const byte POWER_COAL = 0x02;
 
 const byte BUILDING_BASE = 0x20;
 
 const byte BUILDING_HOUSE_SMALL = 0x00;
-const byte BUILDING_HOUSE_LARGE = 0x02;
-const byte BUILDING_APARTMENT_SMALL = 0x04;
-const byte BUILDING_APARTMENT_LARGE = 0x06;
+const byte BUILDING_HOUSE_LARGE = 0x01;
+const byte BUILDING_APARTMENT_SMALL = 0x02;
+const byte BUILDING_APARTMENT_LARGE = 0x03;
 
 const byte TRANSIT_BASE = 0x40;
 
@@ -133,7 +132,9 @@ int onStructure(byte combinedType, byte id, bool state, byte level) {
   // bluetooth handling here. return 1 on success and 0 on fail maybe
 
   Serial.print(F("Board updated: \nType:"));
-  Serial.println(combinedType);
+  Serial.println(combinedType, BIN);
+//  Serial.println((TRANSIT_BASE+TRANSIT_BUS_STOP) | 1<<7, BIN);
+//  Serial.println(255, BIN);
   Serial.print(F("Coord:"));
   Serial.println(id);
   Serial.print(F("State:"));
@@ -152,7 +153,7 @@ int onStructure(byte combinedType, byte id, bool state, byte level) {
     //Characteristic
     char combinedValue[15] = {0};
     //Add +1 to the type value if state is true
-    sprintf(combinedValue, "00-%02X-%02X-%02X-%02X", updateNum,combinedType+(state? 1 : 0),id, level);
+    sprintf(combinedValue, "00-%02X-%02X-%02X-%02X", updateNum,(state? combinedType | B10000000: combinedType & B01111111),id, level);
     ble.print( F(","));
     ble.println(combinedValue);
     

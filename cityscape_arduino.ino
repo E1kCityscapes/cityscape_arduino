@@ -177,12 +177,12 @@ int onTransit(byte subtype, byte coord, bool state) {
 
 //Wiring + states
 
-bool power_state[] = {};
-byte power_level[] = {};
+bool power_state[NUM_BUILDING] = {};
+byte power_level[NUM_BUILDING] = {};
 
-bool building_state[] = {0};
+bool building_state[NUM_BUILDING] = {0,0,0,0}; //TODO
 
-bool transit_state[] = {};
+bool transit_state[NUM_BUILDING] = {};
 
 void initializePins() {
   for(byte i = 0; i < NUM_BUILDING; i++) {
@@ -190,11 +190,14 @@ void initializePins() {
   }
   for(byte i = 0; i < NUM_POWER; i++) {
     pinMode(POWER_PINS[i], INPUT);
+    pinMode(POWER_POTPINS[i], INPUT);
   }
   for(byte i = 0; i < NUM_TRANSIT; i++) {
     pinMode(TRANSIT_PINS[i], INPUT);
   }
 }
+
+
 
 //Main loop
 
@@ -212,6 +215,15 @@ void loop() {
     if (currentState != transit_state[i]) {
       transit_state[i] = currentState;
       onTransit(TRANSIT_BUS_STOP, i, currentState);
+    }
+  }
+  for(byte i = 0; i < NUM_POWER; i++) {
+    bool currentState = digitalRead(POWER_PINS[i]) == POWER_ISON[i];
+    byte currentLevel = (POWER_POTPINS[i] == 0) ? 255 : (analogRead(POWER_POTPINS[i]) / 4);
+    if (currentState != power_state[i]) {
+      power_state[i] = currentState;
+      
+      onPowerPlant(POWER_TYPES[i], i, currentState, currentLevel);
     }
   }
 }

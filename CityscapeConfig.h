@@ -26,11 +26,14 @@ const byte TRANSIT_BUS_STOP = 0x00;
 
 // Board Pin Layout Constants
 const byte NUM_POWER = 0;
-const byte POWER_PINS[] = {};
-const byte POWER_TYPES[] = {};
+const byte POWER_PINS[] = {}; //ex {13, 14, 15}
+const byte POWER_POTPINS[] = {}; //ex {A0, A0, A18} to indicate no potentiometer for the first two powersources, and pin 18 for the 3rd
+const byte POWER_TYPES[] = {}; //ex {POWER_SOLAR, POWER_SOLAR, POWER_WIND} to indicate the first 2 are solar and third is wind
+const byte POWER_ISON[] = {}; //ex {HIGH, LOW, LOW} to indicate that when voltage is HIGH for the first, and LOW for the last two, the state is on
 
-const byte NUM_BUILDING = 1;
-const byte BUILDING_PINS[] = {22};
+const byte NUM_BUILDING = 4;
+const byte BUILDING_PINS[] = {25,26,27,28};
 
 const byte NUM_TRANSIT = 0;
 const byte TRANSIT_PINS[] = {};
+
